@@ -1,9 +1,95 @@
+def containerRepo = 'docker.io/reedswenson/ambient-weather-exporter'
+def gitBranch = env.BRANCH_NAME.replaceAll('/','_')
+def commitHash = 'not_set'
+def imgBaseDest = 'not_set'
+
 pipeline {
-  agent any
+  agent none
   stages {
-    stage('Hello') {
+    stage("Gather Info"){
+      agent any
       steps {
-        echo 'Hello World'
+        script {
+          commitHash = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+          imgBaseDest = "${containerRepo}:${gitBranch}-${commitHash}"
+          echo "commitHash = ${commitHash} ----> imgBaseDest = ${imgBaseDest}"
+        }
+      }
+    }
+    stage("Build Images") {
+      parallel {
+        stage('AMD64 Build') {
+          agent {
+            kubernetes {
+              yamlFile '.cicd/kaniko-amd64.yaml'
+            }
+          }
+          steps {
+            script {
+                      IMG_DEST = "${imgBaseDest}-amd64"
+                      echo "Image Destination ${IMG_DEST}"
+                  }
+            container('kaniko') {
+              withEnv(['PATH+EXTRA=/busybox',"IMG_DEST=${IMG_DEST}", "CACHE=false"]) {
+                        sh '''#!/busybox/sh
+                        PATH=/usr/local/bin:/kaniko:/busybox /kaniko/executor \
+                        -f `pwd`/Dockerfile \
+                        -c `pwd` \
+                        --snapshot-mode=redo \
+                        --use-new-run  \
+                        --cache=$CACHE \
+                        --destination=$IMG_DEST
+                        '''
+                        }
+            }
+          }
+        }
+        stage('ARM64 Build') {
+          agent {
+            kubernetes {
+              yamlFile '.cicd/kaniko-arm64.yaml'
+            }
+          }
+          steps {
+            script {
+                      IMG_DEST = "${imgBaseDest}-arm64"
+                      echo "Image Destination ${IMG_DEST}"
+                  }
+            container('kaniko') {
+              withEnv(['PATH+EXTRA=/busybox',"IMG_DEST=${IMG_DEST}", "CACHE=false"]) {
+                        sh '''#!/busybox/sh
+                        PATH=/usr/local/bin:/kaniko:/busybox /kaniko/executor \
+                        -f `pwd`/Dockerfile \
+                        -c `pwd` \
+                        --snapshot-mode=redo \
+                        --use-new-run  \
+                        --cache=$CACHE \
+                        --destination=$IMG_DEST
+                        '''
+                        }
+            }
+          }
+        }
+      }
+    }
+    //  manifest-tool --docker-cfg=dockerhub-creds push from-args --platforms=linux/amd64,linux/arm64 --template=reedswenson/ambient-weather-exporter:multi-arch-build-3621c3d-ARCHVARIANT --target=reedswenson/ambient-weather-exporter:multi-arch-build-3621c3d
+    stage("Create Container Manifest") {
+      agent {
+        kubernetes {
+          yamlFile '.cicd/manifest-builder.yaml'
+        }
+      }
+      steps {
+        container('manifest-tool') {
+          withEnv(["IMG_DEST=${imgBaseDest}"]){
+            sh '''
+              manifest-tool --docker-cfg=/docker-config.json push from-args \
+              --platforms=linux/amd64,linux/arm64 \
+              --template=$IMG_DEST-ARCH \
+              --target=$IMG_DEST
+            '''
+          }
+        }
       }
     }
   }
