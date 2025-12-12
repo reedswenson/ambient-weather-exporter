@@ -1,0 +1,12 @@
+[project]
+name = "ambient-weather-exporter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.9"
+dependencies = [
+    "ambient-api>=1.5",
+    "click>=8.1",
+    "prometheus-client>=0.14",
+    "yaml-config-wrapper>=1.0",
+]

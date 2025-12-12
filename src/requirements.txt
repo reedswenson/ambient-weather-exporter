@@ -1,5 +1,0 @@
-ambient_api>=1.5
-click >= 8.1
-prometheus_client>=0.14
-yaml_config_wrapper >=1.0
-

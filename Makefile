@@ -1,13 +1,24 @@
 IMG_TAG=reedswenson/ambient-weather-exporter:latest
 cur_dir:=$(shell pwd)
+platform=linux/amd64
 
-build: clean
-	mkdir .build
-	cp src/*.py src/*.yaml src/*.json src/*.txt .build
-	cd .build && docker build . -f ../Dockerfile -t $(IMG_TAG)
+export_deps:
+	uv export --format requirements.txt --no-hashes --no-annotate > requirements.txt
 
-clean:
-	rm -rf .build
+build: export_deps
+	docker buildx build \
+	-t $(IMG_TAG) \
+	-f Dockerfile \
+	--platform $(platform) \
+	.
+
+push: export_deps
+	docker buildx build \
+	-t $(IMG_TAG) \
+	-f Dockerfile \
+	--platform $(platform) \
+	--push \
+	.
 
 push:
 	docker push $(IMG_TAG)

@@ -1,10 +1,10 @@
-FROM python:3.10-slim-bullseye
+FROM python:3.12-slim-trixie
 
-LABEL maintainer "fleureed@gmail.com"
+LABEL maintainer="fleureed@gmail.com"
 WORKDIR /app
 RUN apt-get update && \
     apt-get upgrade -y
-COPY src/requirements.txt requirements.txt
+COPY requirements.txt requirements.txt
 RUN /usr/local/bin/pip install \
   --root-user-action=ignore \
   --disable-pip-version-check \
